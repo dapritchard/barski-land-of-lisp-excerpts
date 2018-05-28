@@ -1,0 +1,112 @@
+the following is obtained from the Land of Lisp Google group downloaded from:
+https://groups.google.com/forum/#!topic/land-of-lisp/4Ku-bPTdSys
+---------------------------------------------------------------------------------
+
+
+
+
+I just finished reading Land of Lisp, which I enjoyed a lot.
+I used sbcl to run the code, so I had to modify
+a few functions in order to get everything working.
+I want to report these changes, in case somebody is interested in
+using sbcl instead of clisp.
+
+First make sure that the libraries asdf and usocket are loaded.
+asdf is bundled by default with sbcl, usocket is easily installed
+with quicklisp.
+
+ch 7:   dot->png
+ch 13:  serve hello-request-handler
+ch 19:  dod-request-handler
+ch 20:  web-handle-human
+
+chapter 7
+
+;; assuming asdf is loaded.
+(defun dot->png (fname thunk)
+  (with-open-file (*standard-output*
+                   fname
+                   :direction :output
+                   :if-exists :supersede)
+    (funcall thunk))
+  (asdf:run-shell-command
+   (format nil "dot -Tpng -O ~A" fname)))
+
+chapter 13
+
+;; assuming usocket is loaded.
+(defun serve (request-handler)
+  (let ((socket (usocket:socket-listen "127.0.0.1" 8080 :reuse-address t)))
+    (unwind-protect
+         (loop (with-open-stream (stream
+                    (usocket:socket-stream (usocket:socket-accept socket)))
+                 (let* ((url (parse-url (read-line stream nil)))
+                        (path (car url))
+                        (header (get-header stream))
+                        (params (append (cdr url)
+                                        (get-content-params stream header)))
+                        (*standard-output* stream))
+                   (funcall request-handler path header params))))
+      (usocket:socket-close socket))))
+
+(defun hello-request-handler (path header params)
+  (if (equal path "greeting")
+      (let ((name (assoc 'name params)))
+        (format t "HTTP/1.1 200 OK~%~%")
+        (if (not name)
+            (princ "<html><form>What is your name?<input name='name' /></form></html>")
+            (format t "<html>Nice to meet you, ~a!</html>" (cdr name))))
+      (princ "Sorry... I don't know that page.")))
+
+chapter 19
+
+(defun dod-request-handler (path header params)
+  (format t "HTTP/1.1 200 OK~%~%")
+  (if (equal path "game.html")
+      (progn (princ "<!doctype html>")
+             (tag center ()
+               (princ "Welcome to DICE OF DOOM!")
+               (tag br ())
+               (let ((chosen (assoc 'chosen params)))
+                 (when (or (not *cur-game-tree*) (not chosen))
+                   (setf chosen nil)
+                   (web-initialize))
+                 (cond ((lazy-null (caddr *cur-game-tree*))
+                        (web-announce-winner (cadr *cur-game-tree*)))
+                       ((zerop (car *cur-game-tree*))
+                        (web-handle-human
+                         (when chosen
+                           (read-from-string (cdr chosen)))))
+                       (t (web-handle-computer))))
+               (tag br())
+               (draw-dod-page *cur-game-tree* *from-tile*)))
+      (princ "Sorry... I don't know that page.")))
+
+chapter 20
+
+;; the function web-handle-human must also be modified as follows.
+(defun web-handle-human (pos)
+  (cond ((not pos) (princ "Please choose a hex to move from:"))
+        ((eq pos 'pass) (setf *cur-game-tree*
+                              (cadr (lazy-car (caddr *cur-game-tree*))))
+         (princ "Your reinforcements have been placed.")
+         (tag a (href (make-game-link nil))
+           (princ "continue")))
+        ((not *from-tile*) (setf *from-tile* pos)
+         (princ "Now choose a destination:"))
+        ((eq pos *from-tile*) (setf *from-tile* nil)
+         (princ" Move cancelled."))
+        (t (setf *cur-game-tree*
+             (pick-chance-branch
+                (cadr *cur-game-tree*)
+                 (lazy-find-if (lambda (move)
+                                 (equal (car move)
+                                        (list *from-tile* pos)))
+                               (caddr *cur-game-tree*))))
+           (setf *from-tile* nil)
+           (princ "You may now ")
+           (tag a (href (make-game-link 'pass))
+             (princ "pass"))
+           (princ " or make another move:"))))
+
+That's it.
