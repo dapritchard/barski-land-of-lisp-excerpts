@@ -1,9 +1,11 @@
+;; printing text with the format function, pages 221 - 235
+
 ;; a game where the player has to strategically move around the grid while being
 ;; chased by murderous robots.  If the player runs into a robot then he or she
 ;; loses the game, and the player wins the game by destroying all of the robots.
 ;; The robots can be killed by tricking two into running into each other, which
 ;; kills both and creates a scrap heap.  Furthermore, if yet another robot runs
-;; into a scrap heap, then that robot will also die.
+;; into a scrap heap, then that robot will also die.  Page 234.
 ;;
 ;; the player can move to any of the eight surrounding squares on the map, or
 ;; they can teleport to a random location in the map.
@@ -17,7 +19,7 @@
      ;; that the player need to press to move in that direction.
      ;;
      ;; to understand the value corresponding to `direction`, first we need to
-     ;; know that the map is represented internally as a one-dimensional arlray
+     ;; know that the map is represented internally as a one-dimensional array
      ;; using row-major ordering.  Then the value corresponding to `direction`
      ;; represents the number of elements in the array player or robot need to
      ;; move.  So for example to move left, the number of elements would be -1,
